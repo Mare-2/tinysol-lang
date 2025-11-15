@@ -149,6 +149,10 @@ and vars_of_cmd = function
   | Block(_,c) -> vars_of_cmd c
   | ExecBlock(c) -> vars_of_cmd c
 
+let vars_of_contract (Contract(_,vdl,_)) = 
+  List.fold_left (fun acc vd -> match vd with 
+    IntVar x | BoolVar x | AddrVar x -> x::acc ) [] vdl 
+
 let string_of_execstate evl = function
   | St st -> string_of_sysstate st evl
   | Cmd (c,st,a) -> "Cmd " ^ (string_of_cmd c) ^ "," ^ (string_of_sysstate st evl) ^ "," ^ a 
