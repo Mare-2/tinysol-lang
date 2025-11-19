@@ -4,7 +4,7 @@ contract C1 {
     int x;
     bool b;
 
-    function f1() public { 
+    function f1() public payable { 
         if (b) x = x+1;
         else b=true;
     }
@@ -15,7 +15,7 @@ contract C1 {
         else skip;
     }
 
-    function f3(int amt) public {
+    function f3(uint amt) public {
         if (this.balance < 8) b=false;
         else msg.sender.transfer(amt);
     }

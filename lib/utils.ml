@@ -97,7 +97,7 @@ and vars_of_cmd = function
 
 let vars_of_contract (Contract(_,vdl,_)) : ide list = 
   List.fold_left (fun acc vd -> match vd with 
-    IntVar x | BoolVar x | AddrVar x -> x::acc ) [] vdl 
+    IntVar x | UintVar x | BoolVar x | AddrVar x -> x::acc ) [] vdl 
 
 
 (******************************************************************************)
@@ -155,6 +155,7 @@ and string_of_cmd = function
 
 and string_of_var_decl = function
   | IntVar(x) -> "int " ^ x
+  | UintVar(x) -> "uint " ^ x
   | BoolVar(x) -> "bool " ^ x
   | AddrVar(x) -> "address " ^ x
 

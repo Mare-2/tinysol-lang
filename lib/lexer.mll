@@ -55,6 +55,7 @@ rule read_token =
   | "function" { FUN }
   | "," { ARGSEP }  
   | "int" { INT }
+  | "uint" { UINT }
   | "bool" { BOOL }
   | "address" { ADDR }
   | "public" { PUBLIC }

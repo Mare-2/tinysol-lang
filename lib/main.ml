@@ -94,7 +94,8 @@ let eval_var_decls (vdl : var_decl list) (e : env): env =
   List.fold_left
     (fun acc vd ->
       match vd with
-        | IntVar x  -> acc |> bind x (Int 0)
+        | IntVar x  
+        | UintVar x -> acc |> bind x (Int 0)
         | BoolVar x -> acc |> bind x (Bool false)
         | AddrVar x -> acc |> bind x (Addr "0")
     )
@@ -174,7 +175,8 @@ let sem_decl (e,l) = function
 let init_storage (Contract(_,vdl,_)) : ide -> exprval =
   List.fold_left (fun acc var -> 
       let (x,v) = (match var with 
-        | IntVar x  -> (x, Int 0)
+        | IntVar x  
+        | UintVar x -> (x, Int 0)
         | BoolVar x -> (x, Bool false)
         | AddrVar x -> (x, Addr "0"))
       in bind x v acc) botenv vdl 
@@ -233,9 +235,10 @@ let find_fun (Contract(_,_,fdl)) (f : ide) : fun_decl option =
 let bind_fargs_aargs (xl : var_decl list) (vl : exprval list) : env =
    List.fold_left2 
    (fun acc x_decl v -> match (x_decl,v) with 
-    | (IntVar x, Int _) 
+    | (IntVar x, Int _)
     | (BoolVar x, Bool _) 
     | (AddrVar x, Addr _) -> bind x v acc
+    | (UintVar x, Int n) when n>=0 -> bind x v acc
     | _ -> failwith "bind_fargs_aargs") 
    botenv 
    xl 
@@ -276,9 +279,11 @@ let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : sysstate =
             |> bind tx.txto to_state; 
           stackenv = st.stackenv;
           active = tx.txto :: st.active }
-    | Some (Proc(_,xl,c,_,_))
-    | Some (Constr(xl,c,_)) ->
-     (* TODO : if not payable, value = 0 *)
+    | Some (Proc(_,xl,c,_,p))
+    | Some (Constr(xl,c,p)) ->
+        if not p && tx.txvalue>0 then 
+          failwith "exec_tx: sending ETH to a non-payable function"
+      else
         let xl',vl' =
           if deploy then match tx.txargs with 
             _::al -> 

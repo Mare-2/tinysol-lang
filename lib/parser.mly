@@ -38,6 +38,7 @@ open Ast
 %token CONSTR
 %token FUN
 %token INT
+%token UINT
 %token BOOL
 %token ADDR
 %token FIELDSEP
@@ -139,6 +140,7 @@ cmd:
 
 var_decl:
   | INT x = ID; CMDSEP { IntVar x }
+  | UINT x = ID; CMDSEP { UintVar x }
   | BOOL x = ID; CMDSEP { BoolVar x }
   | ADDR x = ID; CMDSEP { AddrVar x }
 ;
@@ -167,6 +169,7 @@ formal_args:
 
 formal_arg:
   | INT; x = ID { IntVar x }
+  | UINT; x = ID { UintVar x }
   | BOOL; x = ID { BoolVar x }
   | ADDR; x = ID { AddrVar x }
 ;

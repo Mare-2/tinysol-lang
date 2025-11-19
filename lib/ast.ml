@@ -8,7 +8,7 @@ type addr = string
 
 type exprval = 
   | Bool of bool 
-  | Int of int 
+  | Int of int
   | Addr of string
 
 (* expressions *)
@@ -50,6 +50,7 @@ and cmd =
 
 and var_decl =
   | IntVar of ide 
+  | UintVar of ide
   | BoolVar of ide 
   | AddrVar of ide 
 
