@@ -58,7 +58,7 @@ let rec eval_expr (st : sysstate) (a : addr) = function
       | _ -> raise (TypeError "Add")
     )    
   | Sub(e1,e2) -> (match (eval_expr st a e1,eval_expr st a e2)  with
-        (Int n1,Int n2) when n1>=n2 -> Int(n1 - n2)
+        (Int n1,Int n2) -> Int(n1 - n2)
       | _ -> raise (TypeError "Sub")
     )
   | Mul(e1,e2) -> (match (eval_expr st a e1,eval_expr st a e2)  with

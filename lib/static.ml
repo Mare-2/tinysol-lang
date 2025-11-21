@@ -88,6 +88,7 @@ let rec typecheck_expr (vdl : var_decl list) = function
   | Sub(e1,e2) ->
     (match (typecheck_expr vdl e1,typecheck_expr vdl e2) with
      | (t1,t2) when subtype t1 IntConstT && subtype t2 IntConstT -> IntConstT
+     | (t1,t2) when subtype t1 UintT && subtype t2 UintT -> UintT
      | (t1,t2) when subtype t1 IntT && subtype t2 IntT -> IntT
      | (t1,_) when t1<>IntT -> raise (TypeError (e1,t1,IntT))
      | (_,t2) -> raise (TypeError (e2,t2,IntT)))
@@ -145,8 +146,12 @@ let rec typecheck_cmd (vdl : var_decl list) = function
 
 
 let typecheck_fun (vdl : var_decl list) = function
-  | Constr (al,c,_) -> typecheck_cmd (merge_var_decls vdl al) c
-  | Proc (_,al,c,_,__) -> typecheck_cmd (merge_var_decls vdl al) c
+  | Constr (al,c,_) ->
+      no_dup_var_decls al && 
+      typecheck_cmd (merge_var_decls vdl al) c
+  | Proc (_,al,c,_,__) ->
+      no_dup_var_decls al && 
+      typecheck_cmd (merge_var_decls vdl al) c
 
 let typecheck_contract (Contract(_,vdl,fdl)) =
   (* no multiply declared variables *)

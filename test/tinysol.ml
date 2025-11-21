@@ -200,6 +200,24 @@ let%test "test_exec_tx_8" = test_exec_tx
   ["x==1"; "this.balance==3"]
 
 
+let%test "test_exec_tx_8" = test_exec_tx
+  "contract C {
+      int x;
+      int y;
+      function f(int x) public { int x; y=x; x=3; }
+      function g(int y) public { x=y; y=-1; }
+  }"
+  ["0xA:0xC.g(1)"; "0xA:0xC.f(2)"] 
+  ["x==1"; "y==0"]
+
+let%test "test_exec_tx_9" = test_exec_tx
+  "contract C {
+      uint x;
+      function f(int y) public { x=7; x = uint(y)-1; }
+  }"
+  ["0xA:0xC.f(3)"; "0xA:0xC.f(0)"] 
+  ["x==2"]
+
 let test_typecheck (src: string) (exp : bool)=
   let c = parse_contract src in 
   try typecheck_contract c = exp
@@ -257,7 +275,7 @@ let%test "test_typecheck_10" = test_typecheck
     uint x;
     function f() public { x = x-1; }
 }"
-false
+true
 
 let%test "test_typecheck_11" = test_typecheck 
 "contract C {
@@ -458,3 +476,38 @@ let%test "test_typecheck_36" = test_typecheck
     constructor() { x=1; }
 }"
 false
+
+let%test "test_typecheck_37" = test_typecheck 
+"contract C {
+    int x;
+    function f(int b, address a, bool b) public { require b; }
+}"
+false
+
+let%test "test_typecheck_38" = test_typecheck 
+"contract C {
+    int x;
+    function f() public { { int y; y=x+1; } }
+}"
+true
+
+let%test "test_typecheck_39" = test_typecheck 
+"contract C {
+    int x;
+    function f(int x) public { }
+}"
+true
+
+let%test "test_typecheck_40" = test_typecheck 
+"contract C {
+    int x;
+    function f(int x) public { int x; x = 1; }
+}"
+true
+
+let%test "test_typecheck_41" = test_typecheck 
+  "contract C {
+      uint x;
+      function f(int y) public { x=7; x = uint(y)-1; }
+  }"
+  true
