@@ -15,6 +15,7 @@ type exprtype =
 
 (* TypeError(expression, inferred type, expected type) *)
 exception TypeError of expr * exprtype * exprtype
+exception ImmutabilityError of ide
 exception UndeclaredVar of ide
 exception MultipleDecl of ide
 
@@ -29,7 +30,7 @@ let lookup_type (x : ide) (vdl : var_decl list) : exprtype option =
   else if x="msg.value" then Some UintET else 
   vdl 
   |> List.map (fun vd -> match vd with
-    | VarT(t),x  -> (exprtype_of_decltype t),x 
+    | VarT(t,_),x  -> (exprtype_of_decltype t),x 
     | MapT(tk,tv),x ->  MapET(exprtype_of_decltype tk, exprtype_of_decltype tv),x)
   |> List.fold_left
   (fun acc (t,y) -> if acc=None && x=y then Some t else acc)
@@ -135,9 +136,20 @@ let rec typecheck_expr (vdl : var_decl list) = function
       | _ as t -> raise (TypeError (e,t,IntET))) 
 ;;
 
+let is_immutable (x : ide) (vdl : var_decls) = 
+  List.fold_left (fun acc vd -> match vd with
+  | VarT(_,i),y when y=x -> i
+  | _ -> acc  
+  ) 
+  false 
+  vdl
+
+
 let rec typecheck_cmd (vdl : var_decl list) = function 
     | Skip -> true
     | Assign(x,e) -> 
+        if is_immutable x vdl then raise (ImmutabilityError x)
+        else
         let te = typecheck_expr vdl e in
         let tx = typecheck_expr vdl (Var x) in
         if subtype te tx then true else raise (TypeError (e,te,tx))

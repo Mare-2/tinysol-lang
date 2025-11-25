@@ -193,13 +193,12 @@ opt_immutable:
   | /* empty */ { false }
 
 var_type:
-  | t = base_type { VarT(t) }
+  | t = base_type; i = opt_immutable { VarT(t,i) }
   | MAPPING; LPAREN; t1 = base_type; opt_id; MAPSTO; t2 = base_type; opt_id; RPAREN { MapT(t1,t2) }
 
 var_decl:
-  | t = var_type; opt_immutable; x = ID; CMDSEP { t,x }
+  | t = var_type; x = ID; CMDSEP { t,x }
 ;
-(* TODO: add immutable and payable in ast *)
 
 visibility:
   | PUBLIC { Public }
@@ -218,10 +217,10 @@ formal_args:
   | a = separated_list(ARGSEP, formal_arg) { a } ;
 
 formal_arg:
-  | INT;  x = ID { VarT(IntBT),x }
-  | UINT; x = ID { VarT(UintBT),x }
-  | BOOL; x = ID { VarT(BoolBT),x }
-  | ADDR; opt_payable; x = ID { VarT(AddrBT),x } (* TODO: handle payable *)
+  | INT;  x = ID { VarT(IntBT,false),x }
+  | UINT; x = ID { VarT(UintBT,false),x }
+  | BOOL; x = ID { VarT(BoolBT,false),x }
+  | ADDR; opt_payable; x = ID { VarT(AddrBT,false),x } (* TODO: handle payable *)
 ;
 
 transaction:

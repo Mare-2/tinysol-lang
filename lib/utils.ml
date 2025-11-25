@@ -177,7 +177,7 @@ and string_of_base_type = function
 | AddrBT -> "address"
 
 and string_of_var_type = function
-| VarT t -> string_of_base_type t
+| VarT(t,i) -> string_of_base_type t ^ (if i then " immutable" else "")
 | MapT(tk,tv) -> "mapping (" ^ string_of_base_type tk ^ " => " ^ string_of_base_type tv ^ ")"
 
 and string_of_var_decl ((t,x) : var_decl) : string = 

@@ -49,8 +49,17 @@ and cmd =
 
 and base_type = IntBT | UintBT | BoolBT | AddrBT
 
-and var_type = VarT of base_type | MapT of base_type * base_type
+(* a variable type can be either:
+  - a base type with a bool i telling whether the variable is mutable (i=false) or immutable (i=true)
+  - a mapping from a base type to another base type
+*)
 
+and var_type = VarT of base_type * bool | MapT of base_type * base_type
+
+(* a variable declaration (t,x) consists of:
+   - a type t
+   - an identifier x of the variable
+ *)
 and var_decl = var_type * ide 
 
 and visibility = 

@@ -24,15 +24,15 @@ let%test "test_parse_cmd_2" = test_parse_cmd
 
 let%test "test_parse_cmd_3" = test_parse_cmd
   "{ int x; x=51; }" 
-  (Block([VarT(IntBT),"x"],Assign("x",IntConst 51)))  
+  (Block([VarT(IntBT,false),"x"],Assign("x",IntConst 51)))  
 
 let%test "test_parse_cmd_4" = test_parse_cmd
   "{ int x; x=51; x=x+1; }"
-  (Block([VarT(IntBT),"x"],Seq(Assign("x",IntConst 51),Assign("x",Add(Var "x",IntConst 1)))))  
+  (Block([VarT(IntBT,false),"x"],Seq(Assign("x",IntConst 51),Assign("x",Add(Var "x",IntConst 1)))))  
 
 let%test "test_parse_cmd_5" = test_parse_cmd
   "{ int x; x=51; x=x+1; skip; }" 
-  (Block([VarT(IntBT),"x"],
+  (Block([VarT(IntBT,false),"x"],
     Seq(
       Assign("x",IntConst 51),
       Seq(
@@ -43,7 +43,7 @@ let%test "test_parse_cmd_5" = test_parse_cmd
 
 let%test "test_parse_cmd_6" = test_parse_cmd
   "{ uint x; mapping (uint => int) m; x = m[x+1]; }"
-  (Block ([(VarT UintBT, "x"); (MapT (UintBT, IntBT), "m")],
+  (Block ([(VarT(UintBT,false), "x"); (MapT (UintBT, IntBT), "m")],
   Assign ("x", MapR (Var "m", Add (Var "x", IntConst 1)))))
 
 let%test "test_parse_cmd_7" = test_parse_cmd
@@ -71,9 +71,28 @@ let%test "test_parse_contract_2" = try
   parse_contract
   "contract C { uint x; function f() public { x = block.number; } }"
   = 
-  (Contract ("C", [(VarT UintBT, "x")],
+  (Contract ("C", [(VarT(UintBT,false), "x")],
   [Proc ("f", [], Assign ("x", BlockNum), Public, false)]))
   with _ -> false
+
+let%test "test_parse_contract_3" = try 
+  let _ = parse_contract
+    "contract C {
+        int immutable x;
+        function f(int y) public { y=x; }
+    }"
+  in true 
+  with _ -> false
+
+let%test "test_parse_contract_4" = try 
+  let _ = parse_contract
+    "contract C {
+        int x;
+        function f(int immutable y) public { x=y; }
+    }"
+  in false 
+  with _ -> true
+
 
 (********************************************************************************
  test_trace_cmd : (command, n_steps, variable, expected value after n_steps)
@@ -632,3 +651,17 @@ let%test "test_typecheck_51" = test_typecheck
       function f(uint k) public { x = int(m[k]); }
   }"
   true
+
+let%test "test_typecheck_52" = test_typecheck 
+  "contract C {
+      int immutable y;
+      function f(int k) public { y = k; }
+  }"
+  false
+
+let%test "test_typecheck_53" = test_typecheck 
+  "contract C {
+      int immutable y;
+      function f(int k) public { if (k>0) y = k; else k = y; }
+  }"
+  false
