@@ -157,10 +157,11 @@ let is_immutable (x : ide) (vdl : var_decls) =
   vdl
 
 
-let rec typecheck_cmd (vdl : var_decl list) = function 
+let rec typecheck_cmd (is_constr : bool) (vdl : var_decl list) = function 
     | Skip -> true
     | Assign(x,e) -> 
-        if is_immutable x vdl then raise (ImmutabilityError x)
+        (* the immutable modifier is not checked for the constructor *)
+        if not is_constr && is_immutable x vdl then raise (ImmutabilityError x)
         else
         let te = typecheck_expr vdl e in
         let tx = typecheck_expr vdl (Var x) in
@@ -176,11 +177,11 @@ let rec typecheck_cmd (vdl : var_decl list) = function
           | _ -> failwith ("Assignment to non-map variable " ^ x)
         )
     | Seq(c1,c2) -> 
-        typecheck_cmd vdl c1 && 
-        typecheck_cmd vdl c2
+        typecheck_cmd is_constr vdl c1 && 
+        typecheck_cmd is_constr vdl c2
     | If(e,c1,c2) ->
         let te = typecheck_expr vdl e in
-        if te = BoolET then typecheck_cmd vdl c1 && typecheck_cmd vdl c2
+        if te = BoolET then typecheck_cmd is_constr vdl c1 && typecheck_cmd is_constr vdl c2
         else raise (TypeError (e,te,BoolET))
     | Send(ercv,eamt) -> 
         typecheck_expr vdl ercv = AddrET(true)  (* can only send to payable addresses *) 
@@ -191,17 +192,17 @@ let rec typecheck_cmd (vdl : var_decl list) = function
         if te = BoolET then true else raise (TypeError (e,te,BoolET))
     | Block(lvdl,c) -> 
         let vdl' = merge_var_decls vdl lvdl in
-        typecheck_cmd vdl' c
+        typecheck_cmd is_constr vdl' c
     | _ -> failwith "TODO (Call)"
 
 
 let typecheck_fun (vdl : var_decl list) = function
   | Constr (al,c,_) ->
       no_dup_var_decls al && 
-      typecheck_cmd (merge_var_decls vdl al) c
+      typecheck_cmd true (merge_var_decls vdl al) c
   | Proc (_,al,c,_,__) ->
       no_dup_var_decls al && 
-      typecheck_cmd (merge_var_decls vdl al) c
+      typecheck_cmd false (merge_var_decls vdl al) c
 
 let typecheck_contract (Contract(_,vdl,fdl)) =
   (* no multiply declared variables *)
