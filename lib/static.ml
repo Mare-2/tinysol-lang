@@ -45,13 +45,6 @@ let (>>+)  (out1 : typecheck_expr_result) (out2 : typecheck_expr_result) : typec
   | Error log1, Ok _ -> Error log1 
   | Error log1,Error log2 -> Error (log1 @ log2)
 
-let merge_errors (out1 : typecheck_expr_result) (out2 : typecheck_expr_result) : typecheck_result =
-  match out1,out2 with
-  | Error log1,Error log2 -> Error (log1 @ log2)
-  | Error log1,_ -> Error log1
-  | _,Error log2 -> Error log2
-  | _ -> assert (false) (* should not happen *)
-
 let typeckeck_result_from_expr_result (out : typecheck_expr_result) : typecheck_result =
   match out with
   | Error log -> Error log
