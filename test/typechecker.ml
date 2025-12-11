@@ -595,20 +595,20 @@ let%test "test_typecheck_mutability_2" = test_typecheck
 let%test "test_typecheck_mutability_3" = test_typecheck
   "contract C {
       uint x;
-      function f(uint y) public pure { int z; z = x*y; }
+      function f(uint y) public pure { uint z; z = x*y; }
   }"
   false (* f cannot be declared as pure because it (potentially) depends on the state *)
 
 let%test "test_typecheck_mutability_4" = test_typecheck
   "contract C {
       uint x;
-      function f(int y) public pure { int z; z = y*y; }
+      function f(uint y) public pure { uint z; z = y*y; }
   }"
-  false (* f cannot be declared as pure because it (potentially) depends on the state *)
+  true (* f is pure because it does not depend on the state *)
 
 let%test "test_typecheck_mutability_5" = test_typecheck
   "contract C {
-    int x;
+    uint x;
     constructor() { x = 1; }
     function f() public { require(msg.value == 0); x = 2; }
   }"
@@ -616,7 +616,7 @@ let%test "test_typecheck_mutability_5" = test_typecheck
 
 let%test "test_typecheck_mutability_6" = test_typecheck
   "contract C {
-    int x;
+    uint x;
     constructor() { x = 1; }
     function f() public payable { require(msg.value == 0); x = 2; }
   }"
