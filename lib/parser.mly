@@ -235,10 +235,15 @@ local_var_decl:
   | t = ID; x = ID { { ty = VarT(CustomBT(t)); name = x; } }
 ;
 
+opt_id_decons:
+  | x = ID; { Some x }
+  | /* empty */ { None }
+
 nonseq_cmd:
   | SKIP; CMDSEP;  { Skip }
   | REQ; e = expr; CMDSEP; { Req(e) } 
-  | RETURN; el = separated_list(ARGSEP, expr); CMDSEP; { Return(el) } 
+  | RETURN; LPAREN; el = separated_nonempty_list(ARGSEP, expr); RPAREN; CMDSEP; { Return(el) } 
+  | RETURN; e = expr; CMDSEP; { Return([e]) } 
   | x = ID; TAKES; e = expr; CMDSEP; { Assign(x,e) }
   | x = ID; ADDTAKES; e = expr; CMDSEP; { Assign(x,Add(Var(x),e)) }
   | x = ID; SUBTAKES; e = expr; CMDSEP; { Assign(x,Sub(Var(x),e)) }
@@ -248,6 +253,7 @@ nonseq_cmd:
   | rcv = expr; DOT; TRANSFER; LPAREN; amt=expr; RPAREN; CMDSEP; { Send(rcv,amt) }
   | vd = local_var_decl; CMDSEP; { Decl(vd) }
   | e_to = expr; DOT; f = ID; e_value = opt_weivalue; LPAREN; e_args = separated_list(ARGSEP, expr); RPAREN; CMDSEP; { ProcCall(e_to,f,e_value,e_args) }
+  | LPAREN; xl = separated_nonempty_list(ARGSEP,opt_id_decons); RPAREN; TAKES; e = expr; CMDSEP; { Decons(xl,e) }
 ;
 
 cmd:

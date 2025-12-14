@@ -314,6 +314,8 @@ and step_cmd = function
     | Assign(x,e) -> 
       let (e', st') = step_expr (e, st) in CmdSt(Assign(x,e'), st')
 
+    | Decons(_) -> failwith "TODO: multiple return values"
+    
     | MapW(x,ek,ev) when is_val ek && is_val ev ->
         St (update_map st x (exprval_of_expr ek) (exprval_of_expr ev))
     | MapW(x,ek,ev) when is_val ek -> 

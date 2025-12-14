@@ -47,6 +47,7 @@ and vars_of_cmd = function
   | Skip -> []
   | Decl(vd) -> [vd.name]
   | Assign(x,e) -> union [x] (vars_of_expr e)
+  | Decons(_) -> failwith "TODO: multiple return values"
   | MapW(x,ek,ev) -> union [x] (union (vars_of_expr ek) (vars_of_expr ev))
   | Seq(c1,c2) -> union (vars_of_cmd c1) (vars_of_cmd c2)
   | If(e,c1,c2) -> union (vars_of_expr e) (union (vars_of_cmd c1) (vars_of_cmd c2))
@@ -152,6 +153,7 @@ and string_of_cmd = function
   | Skip -> "skip;"
   | Decl d -> string_of_local_var_decl d ^ " ;"
   | Assign(x,e) -> x ^ " = " ^ string_of_expr e ^ ";"
+  | Decons(_) -> failwith "TODO: multiple return values"
   | MapW(x,ek,ev) -> x ^ "[" ^ string_of_expr ek ^ "] = " ^ string_of_expr ev ^ ";"
   | Seq(c1,c2) -> string_of_cmd c1 ^ " " ^ string_of_cmd c2
   | If(e,c1,c2) -> "if (" ^ string_of_expr e ^ ") " ^ string_of_cmd c1 ^ " else " ^ string_of_cmd c2 ^ ""

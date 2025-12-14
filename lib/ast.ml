@@ -48,6 +48,7 @@ type expr =
 and cmd =
   | Skip
   | Assign of ide * expr                (* Variable assignment *)
+  | Decons of ide option list * expr    (* Deconstruction of multiple return values *)
   | MapW of ide * expr * expr           (* Map assignment *)
   | Seq of cmd * cmd                    (* Sequencing *)
   | If of expr * cmd * cmd              (* Conditional command *)

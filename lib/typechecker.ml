@@ -387,6 +387,9 @@ let rec typecheck_cmd (is_constr : bool) (edl : enum_decl list) (vdl : all_var_d
           | Ok(te),Ok(tx) -> if subtype te tx then Ok() else Error [TypeError (e,te,tx)]
           | res1,res2 -> typeckeck_result_from_expr_result (res1 >>+ res2)
         )
+
+    | Decons(_) -> failwith "TODO: multiple return values"
+    
     | MapW(x,ek,ev) ->  
         (match typecheck_expr edl vdl (Var x),
                typecheck_expr edl vdl ek,

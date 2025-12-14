@@ -179,3 +179,25 @@ let%test "test_parse_contract_19" = test_parse
 let%test "test_parse_contract_19" = test_parse
   "contract C { int public constant N=1; }"
   false
+
+let%test "test_parse_contract_20" = test_parse
+  "contract C { uint x; bool b; function f() public returns (uint,bool) { } }"
+  true
+
+let%test "test_parse_contract_21" = test_parse
+  "contract C { uint x; bool b; function f() public returns (uint,bool) { return(x,b); } }"
+  true
+
+let%test "test_parse_contract_22" = test_parse
+  "contract C { uint x; bool b; 
+    function f() public returns (uint,bool) { return(x,b); }
+    function g() public { int y; bool z; (y,z) = this.f(); }
+  }"
+  true
+
+let%test "test_parse_contract_23" = test_parse
+  "contract C { uint x; bool b; 
+    function f() public returns (uint,bool) { return(x,b); }
+    function g() public { int y; (y,) = this.f(); }
+  }"
+  true
