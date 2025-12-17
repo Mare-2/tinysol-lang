@@ -49,7 +49,7 @@ To run unit tests:
 dune test
 ```
 
-You can specify unit tests for a specific contract. For instance, consider the sample [Bank](test/contracts/Bank.sol) contract:
+You can specify unit tests for a specific contract. For instance, consider the sample [Bank](contracts/Bank.sol) contract:
 ```solidity
 //SPDX-License-Identifier: UNLICENSED
 pragma solidity >= 0.8.2;
@@ -71,11 +71,11 @@ contract Bank {
     }
 }
 ```
-A possible unit test for our contract is the following [Bank.t](test/contracts/Bank.t):
+A possible unit test for our contract is the following [Bank.t](contracts/Bank.t):
 ```
 faucet 0xA 100
 faucet 0xB 100
-deploy 0xA:0xC() "test/contracts/Bank.sol"
+deploy 0xA:0xC() "contracts/Bank.sol"
 
 0xA:0xC.deposit{value:20}()
 assert 0xA this.balance==80
@@ -97,7 +97,7 @@ assert 0xC this.balance==35
 
 To run this unit test:
 ```bash
-dune exec tinysol unittest test/contracts/Bank.t
+dune exec tinysol unittest contracts/Bank.t
 ```
 The output is the following:
 ```
@@ -106,7 +106,7 @@ accounts: []
 accounts: [0xA -> { balance=100; } ]
 --- faucet 0xB 100 --->
 accounts: [0xB -> { balance=100; } 0xA -> { balance=100; } ]
---- deploy 0xA:0xC.constructor{value: 0}() test/contracts/Bank.sol --->
+--- deploy 0xA:0xC.constructor{value: 0}() contracts/Bank.sol --->
 accounts: [0xC -> { balance=0; credits=<map>; } 0xB -> { balance=100; } 0xA -> { balance=100; } ]
 --- 0xA:0xC.deposit{value: 20}() --->
 accounts: [0xC -> { balance=20; credits=<map>; } 0xB -> { balance=100; } 0xA -> { balance=80; } ]
