@@ -37,6 +37,8 @@ let rec step_expr (e,st) = match e with
   | Not(e) -> 
     let (e', st') = step_expr (e, st) in (Not e', st')
 
+(* Issue #2: Short-circuit semantics of boolean operatorShort-circuit semantics of boolean operatorss *)
+  | And(e1,_) when is_val e1 && (bool_of_expr e1 = false) -> (BoolConst false, st)
   | And(e1,e2) when is_val e1 && is_val e2 ->
     let (b1,b2) = bool_of_expr e1,bool_of_expr e2 in 
     (BoolConst (b1 && b2), st)         
@@ -45,6 +47,7 @@ let rec step_expr (e,st) = match e with
   | And(e1,e2) -> 
     let (e1', st') = step_expr (e1, st) in (And(e1',e2), st')
 
+  | Or(e1,_) when is_val e1 && (bool_of_expr e1 = true) -> (BoolConst true, st)
   | Or(e1,e2) when is_val e1 && is_val e2 ->
     let (b1,b2) = bool_of_expr e1,bool_of_expr e2 in 
     (BoolConst(b1 || b2), st)
