@@ -1,5 +1,10 @@
 (* CONTROLLARE SE SONO UTILI, altrimenti ciccia *)
 
+(*Test 3 AND primo parametro un'espressione da risolvere che dà falso 
+controllare che non entri nel secondo parametro
+Test 4 AND primo parametro è un'espressione da risolvere che dà vero 
+quindi controlla il secondo parametro*)
+
 (* Test chained AND operators *)
 let%test "test_and_chained" = test_exec_tx
   "contract C {
