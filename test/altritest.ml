@@ -5,7 +5,7 @@ controllare che non entri nel secondo parametro
 Test 4 AND primo parametro è un'espressione da risolvere che dà vero 
 quindi controlla il secondo parametro*)
 
-(* Test chained AND operators *)
+(* Test chained AND operators *) (*INUTILE*)
 let%test "test_and_chained" = test_exec_tx
   "contract C {
     int x;
@@ -21,7 +21,8 @@ let%test "test_and_chained" = test_exec_tx
   ["0xA:0xC.f()"]
   ["x==2"; "b"]
 
-(* Test chained AND with early termination *)
+(* Test chained AND with early termination *) (*UTILE*)
+(*Lo abbiamo usato ma con val<0*)
 let%test "test_and_chained_shortcircuit" = test_exec_tx
   "contract C {
     int x;
@@ -37,7 +38,7 @@ let%test "test_and_chained_shortcircuit" = test_exec_tx
   ["0xA:0xC.f()"]
   ["x==-1"; "b==false"]
 
-(* Test chained OR operators *)
+(* Test chained OR operators *) (*INUTILE*)
 let%test "test_or_chained" = test_exec_tx
   "contract C {
     int x;
@@ -53,7 +54,8 @@ let%test "test_or_chained" = test_exec_tx
   ["0xA:0xC.f()"]
   ["x==2"; "b==false"]
 
-(* Test chained OR with early termination *)
+(* Test chained OR with early termination *) (*UTILE*)
+(*Lo abbiamo fatto ma con il primo setX a -1*)
 let%test "test_or_chained_shortcircuit" = test_exec_tx
   "contract C {
     int x;
@@ -69,7 +71,7 @@ let%test "test_or_chained_shortcircuit" = test_exec_tx
   ["0xA:0xC.f()"]
   ["x==1"; "b"]
 
-(* Test mixed AND/OR operators *)
+(* Test mixed AND/OR operators *) (*Inutile*)
 let%test "test_mixed_and_or" = test_exec_tx
   "contract C {
     int x;
@@ -85,7 +87,7 @@ let%test "test_mixed_and_or" = test_exec_tx
   ["0xA:0xC.f()"]
   ["x==2"; "b"]
 
-(* Test mixed with shortcircuit in first part *)
+(* Test mixed with shortcircuit in first part *) (*Ne abbiamo fatti simili uno per and e uno per or*)
 let%test "test_mixed_shortcircuit_first" = test_exec_tx
   "contract C {
     int x;
@@ -101,7 +103,7 @@ let%test "test_mixed_shortcircuit_first" = test_exec_tx
   ["0xA:0xC.f()"]
   ["x==2"; "b"]
 
-(* Test with local variables *)
+(* Test with local variables *) (*NON LO SO, richiesta seconda opinione*)
 let%test "test_and_with_locals" = test_exec_tx
   "contract C {
     int x;
@@ -114,7 +116,7 @@ let%test "test_and_with_locals" = test_exec_tx
   ["0xA:0xC.f()"]
   ["x==0"; "b==false"]
 
-(* Test with comparisons *)
+(* Test with comparisons *) (*NON LO SO, richiesta seconda opinione*)
 let%test "test_and_with_comparison" = test_exec_tx
   "contract C {
     int x;
@@ -132,7 +134,7 @@ let%test "test_and_with_comparison" = test_exec_tx
   ["0xA:0xC.f()"]
   ["x==5"; "y==0"; "b==false"]
 
-(* Test OR with comparison *)
+(* Test OR with comparison *) (*NON LO SO, richiesta seconda opinione*)
 let%test "test_or_with_comparison" = test_exec_tx
   "contract C {
     int x;
