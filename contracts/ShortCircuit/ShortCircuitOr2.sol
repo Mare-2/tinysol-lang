@@ -2,14 +2,14 @@
 pragma solidity >= 0.8.2;
 
 contract C {
-    int x;
-    bool b;
+  int x;
+  bool b;
 
-    function fail() public returns(bool) {
-      x = 1;
-      return true;
-    }
-    function f() public {
-      b = false || this.fail();
-    }
+  function fail() public returns(bool) {
+    x = 1;
+    return true;
   }
+  function f() public {
+    b = false || this.fail();
+  }
+}

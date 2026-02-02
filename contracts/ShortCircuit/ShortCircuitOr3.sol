@@ -5,13 +5,13 @@ pragma solidity >= 0.8.2;
 e se risulta true non viene controllato il secondo parametro  */
 
 contract C {
-    int x;
-    bool b;
-    function setX(int val) public returns (bool) {
-        x = val;
-        return true;
-    }
-    function f() public {
-      b = (true && this.setX(1)) || this.setX(2);
-    }
+  int x;
+  bool b;
+  function setX(int val) public returns (bool) {
+    x = val;
+    return true;
   }
+  function f() public {
+    b = (true && this.setX(1)) || this.setX(2);
+  }
+}

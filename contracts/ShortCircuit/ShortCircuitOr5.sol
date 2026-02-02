@@ -5,13 +5,13 @@ pragma solidity >= 0.8.2;
 concatenati il controllo si interrompa appena incontra il primo true*/
 
 contract C {
-    int x;
-    bool b;
-    function setX(int val) public returns (bool) {
-        x = val;
-        return val > 0;
-    }
-    function f() public {
-      b = this.setX(-1) || this.setX(2) || this.setX(3);
-    }
+  int x;
+  bool b;
+  function setX(int val) public returns (bool) {
+    x = val;
+    return val > 0;
   }
+  function f() public {
+    b = this.setX(-1) || this.setX(2) || this.setX(3);
+  }
+}
