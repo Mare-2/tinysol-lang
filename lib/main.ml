@@ -14,7 +14,7 @@ let rec step_expr (e,st) = match e with
   | e when is_val e -> raise NoRuleApplies
 
   | This -> ((AddrConst (List.hd(st.callstack)).callee), st)
-
+ 
   | BlockNum -> (IntConst st.blocknum, st)
 
   | Var x -> (expr_of_exprval (Option.get (lookup_var x st)), st)  
@@ -455,6 +455,145 @@ and step_cmd = function
       | Reverted s -> Reverted s
       | Returned _ -> St (pop_callstack st)
       | CmdSt(c1',st1) -> CmdSt(ExecProcCall(c1'),st1))
+  )
+
+  (*Facciamo una step_cmd castrata che riconosce soltanto i comandi utilizzabili da una funzione con mutabilità "view" *)
+
+and step_cmd_view = function
+  St _ -> raise NoRuleApplies
+
+  | Reverted s -> Reverted s
+
+  | Returned v -> Returned v
+
+  | CmdSt(c,st) -> (match c with
+
+    | Skip -> St st
+
+    | Assign(x,e) when is_val e -> 
+      St (update_var st x (exprval_of_expr_typechecked e (type_of_var x st)))
+        
+    | Assign(x,e) -> 
+      let (e', st') = step_expr (e, st) in CmdSt(Assign(x,e'), st')
+
+    | Decons(_) -> failwith "TODO: multiple return values"
+
+    | MapW(x,ek,ev) when is_val ek && is_val ev ->
+        St (update_map st x (exprval_of_expr ek) (exprval_of_expr ev))
+    | MapW(x,ek,ev) when is_val ek -> 
+      let (ev', st') = step_expr (ev, st) in 
+      CmdSt(MapW(x,ek,ev'), st')
+    | MapW(x,ek,ev) -> 
+      let (ek', st') = step_expr (ek, st) in 
+      CmdSt(MapW(x,ek',ev), st')
+    
+    | Seq(c1,c2) -> (match step_cmd (CmdSt(c1,st)) with
+        | St st1 -> CmdSt(c2,st1)
+        | Reverted s -> Reverted s
+        | Returned v -> Returned v
+        | CmdSt(c1',st1) -> CmdSt(Seq(c1',c2),st1))
+
+    | If(e,c1,c2) when is_val e -> (match exprval_of_expr e with
+        | Bool true  -> CmdSt(c1,st)
+        | Bool false -> CmdSt(c2,st)
+        | _ -> Reverted "if: type error")
+    | If(e,c1,c2) -> 
+        let (e', st') = step_expr (e, st) in
+        CmdSt(If(e',c1,c2), st')
+
+    | Req(e) when is_val e -> 
+        let b = bool_of_expr e in 
+        if b then St st else Reverted "require condition is false"
+    | Req(e) -> 
+      let (e', st') = step_expr (e, st) in CmdSt(Req(e'), st')
+
+    | Return(el) when List.for_all is_val el -> Returned (List.map exprval_of_expr el) 
+    | Return(el) -> (match el with
+      | [e] -> let (e', st') = step_expr (e, st) in CmdSt(Return([e']), st')
+      | _ -> failwith "TODO: multiple return values not supported")
+    
+    | Block(vdl,c) ->
+        let r' = List.fold_left (fun acc vd ->
+          match vd.ty with
+            | VarT(IntBT)        -> acc |> bind vd.name (Int 0) 
+            | VarT(UintBT)       -> acc |> bind vd.name (Uint 0)
+            | VarT(BoolBT)       -> acc |> bind vd.name (Bool false)
+            | VarT(AddrBT _)     -> acc |> bind vd.name (Addr "0")
+            | VarT(EnumBT _)     -> acc |> bind vd.name (Uint 0)
+            | VarT(ContractBT _) -> acc |> bind vd.name (Addr "0")
+            | VarT(UnknownBT _)  -> assert(false) (* should not happen after preprocessing *)
+            | MapT(_) -> failwith "mappings cannot be used in local declarations" 
+        ) botenv vdl in
+        let fr,frl = (List.hd st.callstack),(List.tl st.callstack) in
+        let fr' = { fr with locals = r'::fr.locals } in
+        CmdSt(ExecBlock c, { st with callstack = fr'::frl })
+
+    | ExecBlock(c) -> (match step_cmd_view (CmdSt(c,st)) with
+        | St st -> St (pop_locals st)
+        | Reverted s -> Reverted s
+        | Returned v -> Returned v
+        | CmdSt(c1',st1) -> CmdSt(ExecBlock(c1'),st1))
+
+    | Decl _ -> assert(false) (* should not happen after blockify *)
+
+    | ProcCall(e_to,f,e_value,e_args) when is_val e_to && is_val e_value && List.for_all is_val e_args ->
+        (* retrieve function declaration *)
+        let txfrom = (List.hd (st.callstack)).callee in 
+        let txto   = addr_of_expr e_to in
+        let txvalue  = int_of_expr e_value in
+        let txargs = List.map (fun arg -> exprval_of_expr arg) e_args in
+        (*if lookup_balance dovrebbe controllare se c'è abbastanza saldo per effettuare un trasferimento
+          e Fa un revert se non c'è abbastanza saldo*)
+        if lookup_balance txfrom st < txvalue then 
+          Reverted ("sender " ^ txfrom ^ " has not sufficient wei balance")
+        else
+          
+        (*ELIMINARE--DA QUI-- perchè è un'azione che modifica lo stato del sistema mandando "soldi"*)
+        (*let from_state = 
+          { (st.accounts txfrom) with balance = (st.accounts txfrom).balance - txvalue } in
+        let to_state  = 
+          { (st.accounts txto) with balance = (st.accounts txto).balance + txvalue } in )*)
+        (*--FIN QUI--*)
+
+        let fdecl = Option.get (find_fun_in_sysstate st txto f) in
+        (* TODO: puoi chiamare solo funzioni `view`*)  
+        (* setup new stack frame TODO *)
+        let xl = get_var_decls_from_fun fdecl in
+        let xl',vl' =
+          { ty=VarT(AddrBT false); name="msg.sender"; } :: 
+          { ty=VarT(UintBT); name="msg.value"; } :: xl,
+          Addr txfrom :: 
+          Uint txvalue :: txargs
+        in
+        let fr' = { callee = txto; locals = [bind_fargs_aargs xl' vl'] } in
+        let st' = { accounts = st.accounts 
+                      |> bind txfrom from_state
+                      |> bind txto to_state; 
+                    callstack = fr' :: st.callstack;
+                    blocknum = st.blocknum;
+                    active = st.active } in
+        let c = get_cmd_from_fun fdecl in
+        CmdSt(ExecProcCall(c), st')
+
+    | ProcCall(e_to,f,e_value,e_args) when is_val e_to && is_val e_value -> 
+      let (e_args', st') = step_expr_list (e_args, st) in 
+      CmdSt(ProcCall(e_to,f,e_value,e_args'), st')
+
+    | ProcCall(e_to,f,e_value,e_args) when is_val e_to -> 
+      let (e_value', st') = step_expr (e_value, st) in 
+      CmdSt(ProcCall(e_to,f,e_value',e_args), st')
+
+    | ProcCall(e_to,f,e_value,e_args) -> 
+      let (e_to', st') = step_expr (e_to, st) in 
+      CmdSt(ProcCall(e_to',f,e_value,e_args), st')
+
+    | ExecProcCall(c) -> (match step_cmd_view (CmdSt(c,st)) with
+      | St st -> St (pop_callstack st)
+      | Reverted s -> Reverted s
+      | Returned _ -> St (pop_callstack st)
+      | CmdSt(c1',st1) -> CmdSt(ExecProcCall(c1'),st1))
+    
+    | _ -> Reverted "Una funzione view non permette di modificare lo stato" (**)
   )
 
 (* Recursively evaluate expression until it reaches a value (might not terminate) *)

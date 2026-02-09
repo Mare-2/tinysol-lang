@@ -201,6 +201,11 @@ let get_var_decls_from_fun = function
   | (Constr(vdl,_,_)) -> vdl
   | (Proc(_,vdl,_,_,_,_)) -> vdl
 
+  (*Questa funzione ci permette di restituire la mutabilità della funzione*)
+let get_mut_from_fun = function
+  | (Constr(_,_,fmut)) -> fmut
+  | (Proc(_,_,_,_,fmut,_)) -> fmut
+
 let bind_fargs_aargs (xl : local_var_decl list) (vl : exprval list) : env =
   if List.length xl <> List.length vl then
     failwith "exec_tx: length mismatch between formal and actual arguments"
