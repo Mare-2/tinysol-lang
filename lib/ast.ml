@@ -19,7 +19,7 @@ type expr =
   | BlockNum
   | This
   | Var of ide
-  | MapR of expr * expr
+  | MapR of expr * expr (* Map Return *)
   | BalanceOf of expr
   | Not of expr
   | And of expr * expr

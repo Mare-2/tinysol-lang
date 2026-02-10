@@ -8,9 +8,10 @@ TODO:
 
 Scrivere:
 
-[] ExecFunCallView
-[] ExecProcCallView
+[x] FunCall
 [x] get_mut_from_fun
-[] step_cmd_view
-
+[x] Assign
+[x] Send
+[x] ProCall
+[x] MapW
     
