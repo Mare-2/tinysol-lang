@@ -252,13 +252,19 @@ let rec step_expr (e,st) = match e with
     if lookup_mut_view st && not (is_fun_pure_or_view fdecl) then
         failwith ("calling a non-view function is not allowed in `view` functions")
     else
-    if lookup_balance txfrom st < txvalue then 
-    failwith ("sender has not sufficient wei balance")
+    if mut_view && (txvalue <> 0) then
+      failwith "can't transfer wei when calling `view` function"
     else
+    if lookup_balance txfrom st < txvalue then 
+      failwith ("sender has not sufficient wei balance") 
+    else
+    
+    
     let from_state = 
       { (st.accounts txfrom) with balance = (st.accounts txfrom).balance - txvalue } in
     let to_state  = 
       { (st.accounts txto) with balance = (st.accounts txto).balance + txvalue } in
+
 
     (* setup new callstack frame *)
     let xl = get_var_decls_from_fun fdecl in
@@ -429,9 +435,14 @@ and step_cmd = function
         if lookup_balance txfrom st < txvalue then 
           Reverted ("sender " ^ txfrom ^ " has not sufficient wei balance")
         else
-        let fdecl = Option.get (find_fun_in_sysstate st txto f) in (* messa più in alto la fdecl per verificare se le operazioni in caso di mut view siano effet *)
-          let mut_view = lookup_mut_view st in
-        if mut_view && is_fun_pure_or_view fdecl then Reverted "Calling procedures is not allowed in `view` functions" else
+        let fdecl = Option.get (find_fun_in_sysstate st txto f) in (* messa più in alto la fdecl per verificare se le operazioni in caso di mut view siano effect *)
+        let mut_view = is_fun_view fdecl in
+        if lookup_mut_view st && not (is_fun_pure_or_view fdecl) then
+          Reverted "Calling non `view` procedures is not allowed in `view` functions"
+        else
+        if lookup_mut_view st && txvalue <> 0 then
+          Reverted "Transferring wei is not allowed in `view` functions"
+        else
         let from_state = 
           { (st.accounts txfrom) with balance = (st.accounts txfrom).balance - txvalue } in
         let to_state  = 
@@ -439,9 +450,13 @@ and step_cmd = function
         let xl = get_var_decls_from_fun fdecl in
         let xl',vl' =
           { ty=VarT(AddrBT false); name="msg.sender"; } :: 
-          { ty=VarT(UintBT); name="msg.value"; } :: xl,
+          { ty=VarT(UintBT); name="msg.value"; } ::
+          { ty=VarT(BoolBT); name="mut_view"} ::
+          xl,
           Addr txfrom :: 
-          Uint txvalue :: txargs
+          Uint txvalue ::
+          Bool mut_view ::
+          txargs
         in
         let fr' = { callee = txto; locals = [bind_fargs_aargs xl' vl'] } in
         let st' = { accounts = st.accounts 
@@ -591,20 +606,27 @@ let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : (sysstate,string
         if m<>Payable && tx.txvalue>0 then 
             Error "sending ETH to a non-payable function"
         else
+          let mut_view = is_mut_view m in
           let xl',vl' =
             if deploy then match tx.txargs with 
               _::al -> 
               { ty=VarT(AddrBT false); name="msg.sender"; } ::
-              { ty=VarT(UintBT); name="msg.value"; } :: xl
+              { ty=VarT(UintBT); name="msg.value"; } ::
+              { ty=VarT(BoolBT); name="mut_view" } :: xl
               ,
               Addr tx.txsender :: 
-              Uint tx.txvalue :: 
+              Uint tx.txvalue ::
+              Bool mut_view ::
               al
               | _ -> assert(false) (* should never happen *)
             else
               { ty=VarT(AddrBT false); name="msg.sender"; } :: 
-              { ty=VarT(UintBT); name="msg.value"; } :: xl,
-              Addr tx.txsender :: Uint tx.txvalue :: tx.txargs
+              { ty=VarT(UintBT); name="msg.value"; } ::
+              { ty=VarT(BoolBT); name="mut_view" } :: xl,
+              Addr tx.txsender ::
+              Uint tx.txvalue ::
+              Bool mut_view ::
+              tx.txargs
           in
           let fr' = { callee = tx.txto; locals = [bind_fargs_aargs xl' vl'] } in
           let st' = { accounts = st.accounts 
