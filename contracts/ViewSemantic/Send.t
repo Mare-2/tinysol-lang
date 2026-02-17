@@ -21,14 +21,14 @@ assert 0xC this.balance==7
 assert 0xB this.balance==3
 
 0xA:0xC.carica{value:10}()
-assert 0xC this.balance==10
-assert 0xA this.balance==90
+assert 0xC this.balance==17
+assert 0xA this.balance==80
 
 0xA:0xC.sendView(3)
 assert lastReverted
-assert 0xC this.balance==10
-assert 0xB this.balance==0
+assert 0xC this.balance==17
+assert 0xB this.balance==3
 
 0xA:0xC.sendNonView(3)
-assert 0xC this.balance==7
-assert 0xB this.balance==3
+assert 0xC this.balance==14
+assert 0xB this.balance==6
