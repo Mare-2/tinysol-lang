@@ -1,7 +1,7 @@
 open Ast
 open Sysstate
 open Utils
-
+open Issue_3
 
 (******************************************************************************)
 (*                      Small-step semantics of expressions                   *)
@@ -14,7 +14,7 @@ let rec step_expr (e,st) = match e with
   | e when is_val e -> raise NoRuleApplies
 
   | This -> ((AddrConst (List.hd(st.callstack)).callee), st)
-
+ 
   | BlockNum -> (IntConst st.blocknum, st)
 
   | Var x -> (expr_of_exprval (Option.get (lookup_var x st)), st)  
@@ -244,21 +244,39 @@ let rec step_expr (e,st) = match e with
     let txto = addr_of_expr e_to in
     let txvalue  = int_of_expr e_value in
     let txargs = List.map (fun arg -> exprval_of_expr arg) e_args in
-    if lookup_balance txfrom st < txvalue then 
-      failwith ("sender has not sufficient wei balance")
+
+    let fdecl = Option.get (find_fun_in_sysstate st txto f) in
+    
+    let mut_view = is_fun_view fdecl in
+    
+    if lookup_mut_view st && not (is_fun_pure_or_view fdecl) then
+        failwith ("calling a non-view function is not allowed in `view` functions")
     else
+    if mut_view && (txvalue <> 0) then
+      failwith "can't transfer when calling `view` function"
+    else
+    if lookup_balance txfrom st < txvalue then 
+      failwith ("sender has not sufficient wei balance") 
+    else
+    
+    
     let from_state = 
       { (st.accounts txfrom) with balance = (st.accounts txfrom).balance - txvalue } in
     let to_state  = 
-      { (st.accounts txto) with balance = (st.accounts txto).balance + txvalue } in 
-    let fdecl = Option.get (find_fun_in_sysstate st txto f) in  
+      { (st.accounts txto) with balance = (st.accounts txto).balance + txvalue } in
+
+
     (* setup new callstack frame *)
     let xl = get_var_decls_from_fun fdecl in
     let xl',vl' =
       { ty=VarT(AddrBT false); name="msg.sender"; } :: 
-      { ty=VarT(UintBT); name="msg.value"; } :: xl,
+      { ty=VarT(UintBT); name="msg.value"; } ::
+      { ty=VarT(BoolBT); name="mut_view" } :: (* Variabile che contiene se la funzione in esecuzione è view *)
+      xl,
       Addr txfrom :: 
-      Uint txvalue :: txargs
+      Uint txvalue ::
+      Bool mut_view ::
+      txargs
     in
     let fr' = { callee = txto; locals = [bind_fargs_aargs xl' vl'] } in 
     let st' = { accounts = st.accounts 
@@ -319,14 +337,16 @@ and step_cmd = function
     | Skip -> St st
 
     | Assign(x,e) when is_val e -> 
-        St (update_var st x (exprval_of_expr_typechecked e (type_of_var x st)))
-        
+        update_var_wrapper st x (exprval_of_expr_typechecked e (type_of_var x st))
     | Assign(x,e) -> 
       let (e', st') = step_expr (e, st) in CmdSt(Assign(x,e'), st')
 
     | Decons(_) -> failwith "TODO: multiple return values"
 
     | MapW(x,ek,ev) when is_val ek && is_val ev ->
+      if lookup_mut_view st then
+        Reverted "`view` functions cannot modify state variables"
+      else
         St (update_map st x (exprval_of_expr ek) (exprval_of_expr ev))
     | MapW(x,ek,ev) when is_val ek -> 
       let (ev', st') = step_expr (ev, st) in 
@@ -350,6 +370,9 @@ and step_cmd = function
         CmdSt(If(e',c1,c2), st')
 
     | Send(ercv,eamt) when is_val ercv && is_val eamt -> 
+      if lookup_mut_view st then
+        Reverted "Sending is not allowed in `view` functions"
+      else
         let rcv = addr_of_expr ercv in 
         let amt = int_of_expr eamt in
         let from = (List.hd st.callstack).callee in 
@@ -406,6 +429,7 @@ and step_cmd = function
 
     | Decl _ -> assert(false) (* should not happen after blockify *)
 
+    
     | ProcCall(e_to,f,e_value,e_args) when is_val e_to && is_val e_value && List.for_all is_val e_args ->
         (* retrieve function declaration *)
         let txfrom = (List.hd (st.callstack)).callee in 
@@ -415,18 +439,28 @@ and step_cmd = function
         if lookup_balance txfrom st < txvalue then 
           Reverted ("sender " ^ txfrom ^ " has not sufficient wei balance")
         else
+        let fdecl = Option.get (find_fun_in_sysstate st txto f) in (* messa più in alto la fdecl per verificare se le operazioni in caso di mut view siano effect *)
+        let mut_view = is_fun_view fdecl in
+        if lookup_mut_view st && not (is_fun_pure_or_view fdecl) then
+          Reverted "Calling non `view` procedures is not allowed in `view` functions"
+        else
+        if lookup_mut_view st && txvalue <> 0 then
+          Reverted "Transferring wei is not allowed in `view` functions"
+        else
         let from_state = 
           { (st.accounts txfrom) with balance = (st.accounts txfrom).balance - txvalue } in
         let to_state  = 
           { (st.accounts txto) with balance = (st.accounts txto).balance + txvalue } in 
-        let fdecl = Option.get (find_fun_in_sysstate st txto f) in  
-        (* setup new stack frame TODO *)
         let xl = get_var_decls_from_fun fdecl in
         let xl',vl' =
           { ty=VarT(AddrBT false); name="msg.sender"; } :: 
-          { ty=VarT(UintBT); name="msg.value"; } :: xl,
+          { ty=VarT(UintBT); name="msg.value"; } ::
+          { ty=VarT(BoolBT); name="mut_view"} ::
+          xl,
           Addr txfrom :: 
-          Uint txvalue :: txargs
+          Uint txvalue ::
+          Bool mut_view ::
+          txargs
         in
         let fr' = { callee = txto; locals = [bind_fargs_aargs xl' vl'] } in
         let st' = { accounts = st.accounts 
@@ -576,20 +610,27 @@ let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : (sysstate,string
         if m<>Payable && tx.txvalue>0 then 
             Error "sending ETH to a non-payable function"
         else
+          let mut_view = is_mut_view m in
           let xl',vl' =
             if deploy then match tx.txargs with 
               _::al -> 
               { ty=VarT(AddrBT false); name="msg.sender"; } ::
-              { ty=VarT(UintBT); name="msg.value"; } :: xl
+              { ty=VarT(UintBT); name="msg.value"; } ::
+              { ty=VarT(BoolBT); name="mut_view" } :: xl
               ,
               Addr tx.txsender :: 
-              Uint tx.txvalue :: 
+              Uint tx.txvalue ::
+              Bool mut_view ::
               al
               | _ -> assert(false) (* should never happen *)
             else
               { ty=VarT(AddrBT false); name="msg.sender"; } :: 
-              { ty=VarT(UintBT); name="msg.value"; } :: xl,
-              Addr tx.txsender :: Uint tx.txvalue :: tx.txargs
+              { ty=VarT(UintBT); name="msg.value"; } ::
+              { ty=VarT(BoolBT); name="mut_view" } :: xl,
+              Addr tx.txsender ::
+              Uint tx.txvalue ::
+              Bool mut_view ::
+              tx.txargs
           in
           let fr' = { callee = tx.txto; locals = [bind_fargs_aargs xl' vl'] } in
           let st' = { accounts = st.accounts 

@@ -19,7 +19,7 @@ type expr =
   | BlockNum
   | This
   | Var of ide
-  | MapR of expr * expr
+  | MapR of expr * expr (* Map Return *)
   | BalanceOf of expr
   | Not of expr
   | And of expr * expr
@@ -133,7 +133,9 @@ and local_var_decl = { ty: var_type; name: ide; }
  *)
 
 type fun_decl =
+   (*lista variabili locali * lista comandi * mutabilità funzione*)
   | Constr of local_var_decl list * cmd * fun_mutability_t
+  (*identificativo * lista cmd * visibilità funzione * mutabilità funzione * tipo di ritorno lista*)
   | Proc of ide * local_var_decl list * cmd * visibility_t * fun_mutability_t * (base_type list) 
 
 type enum_decl = Enum of (ide * ide list)

@@ -1,6 +1,6 @@
 // unit testing ShortCircuitAnd1.sol
-faucet 0xA 110
-deploy 0xA:0xC() "C" "contracts/ShortCircuitTest/ShortCircuitAnd1.sol"
+faucet 0xA 100
+deploy 0xA:0xC() "C" "contracts/ShortCircuit/ShortCircuitAnd1.sol"
 assert 0xC this.balance==0
 assert 0xC x==0
 assert 0xC b==false
