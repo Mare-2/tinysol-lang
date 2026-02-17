@@ -19,7 +19,7 @@ contract C {
     function sendView(uint amount) public view {
         recipient.transfer(amount);
     }
-}
+
     function sendView(uint amount) public view {
         recipient.transfer(amount);
     }

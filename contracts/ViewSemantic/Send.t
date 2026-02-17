@@ -1,8 +1,8 @@
-// unit testing SendView.sol
+// unit testing Send.sol
 faucet 0xA 100
 faucet 0xB 0
 
-deploy 0xA:0xC("0xB") "C" "contracts/ViewSemantic/SendView.sol"
+deploy 0xA:0xC("0xB") "C" "contracts/ViewSemantic/Send.sol"
 assert 0xC this.balance==0
 assert 0xA this.balance==100
 assert 0xB this.balance==0
