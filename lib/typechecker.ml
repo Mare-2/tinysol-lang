@@ -51,7 +51,7 @@ let (>>)  (out1 : typecheck_result) (out2 : typecheck_result) : typecheck_result
 type typecheck_expr_result = (exprtype,exn list) result
 
 (* >>+ merges two expression typechecker results *)
-let (>>+)  (out1 : typecheck_expr_result) (out2 : typecheck_expr_result) : typecheck_expr_result =
+let  (>>+)  (out1 : typecheck_expr_result) (out2 : typecheck_expr_result) : typecheck_expr_result =
   match out1,out2 with
   | Ok _,Ok _ -> assert(false) (* should not happen *)
   | Ok _, Error log2 -> Error log2
@@ -59,7 +59,7 @@ let (>>+)  (out1 : typecheck_expr_result) (out2 : typecheck_expr_result) : typec
   | Error log1,Error log2 -> Error (log1 @ log2)
 
 (* boring cast from expression typechecker result to contract typechecker result*)
-let typeckeck_result_from_expr_result (out : typecheck_expr_result) : typecheck_result =
+let typecheck_result_from_expr_result (out : typecheck_expr_result) : typecheck_result =
   match out with
   | Error log -> Error log
   | Ok(_) -> Ok()
@@ -76,10 +76,11 @@ exception EnumOptionNotFound of ide * ide * ide
 exception EnumDupName of ide
 exception EnumDupOption of ide * ide
 exception MapInLocalDecl of ide * ide
-exception MultipleReturnValues of ide
-exception MissingReturnValue of ide
-exception ParameterMismatch of ide
+exception MultipleReturnTypes of ide
+exception MissingReturnType of ide
+exception ParameterMismatch of ide * ide
 exception NegativeTransferValue of ide
+exception FunctionNotFound of ide * ide
 
 let logfun f s = "(" ^ f ^ ")\t" ^ s 
 
@@ -99,7 +100,12 @@ let string_of_typecheck_error = function
 | EnumOptionNotFound (f,x,o) -> logfun f "enum option " ^ o ^ " is not found in enum " ^ x
 | EnumDupName x -> "enum " ^ x ^ " is declared multiple times"
 | EnumDupOption (x,o) -> "enum option " ^ o ^ " is declared multiple times in enum " ^ x
-| MapInLocalDecl (f,x) -> logfun f "mapping " ^ x ^ " not admitted in local declaration" 
+| MapInLocalDecl (f,x) -> logfun f "mapping " ^ x ^ " not admitted in local declaration"
+| MultipleReturnTypes(f) -> logfun f "multiple return types are not admitted"
+| MissingReturnType(f) -> logfun f "function should have a return type"
+| ParameterMismatch(f, cf) -> logfun f "number of argument calling function" ^ cf ^ "does not match function arity"
+| NegativeTransferValue(f) -> logfun f "it is not possible to transfer a negative amount of wei"
+| FunctionNotFound(f, cf) -> logfun f "can't find local function" ^ cf ^ "in contract"
 | ex -> Printexc.to_string ex
 
 let exprtype_of_decltype = function
@@ -385,44 +391,78 @@ let rec typecheck_expr (f : ide) (edl : enum_decl list) vdl (fdl : fun_decl list
   | UnknownCast(_) -> assert(false) (* should not happen after preprocessing *)
   
   | FunCall(e_to, cf, e_value, e_args) -> (
-      let rec check_args (l1 : local_var_decl list) (l2 : expr list) =
+      (*controllo che i tipi delle liste dei parametri passati e formali corrispondano*)
+      let rec check_args (l1 : local_var_decl list) (l2 : expr list) : typecheck_result =
         match (l1,l2) with
-        | [],[] -> Ok(UintET)
+        | [],[] -> Ok()
         | (h1::t1, h2::t2) ->
-            (let ty1 = exprtype_of_decltype (basetype_of_vartype (h1.ty)) in 
-            match typecheck_expr f edl vdl fdl h2 with
-            | Ok(ty2) when subtype ty2 ty1 -> Ok(ty1) >>+ check_args t1 t2
+            let ty1 = exprtype_of_decltype (basetype_of_vartype (h1.ty)) in
+            (match typecheck_expr f edl vdl fdl h2 with
+            | Ok(ty2) when subtype ty2 ty1 -> check_args t1 t2
             | Ok(ty2) -> Error[TypeError (f, h2, ty2, ty1)]
-            | err -> err)
+            | err -> typecheck_result_from_expr_result err)
         | ([], _::_)
-        | (_::_, []) -> Error[ParameterMismatch f]
+        | (_::_, []) -> Error[ParameterMismatch (f, cf)]
       in
       
-      match typecheck_expr f edl vdl fdl e_value with
-      | Ok(t) when subtype t UintET -> Ok(UintET)
-      | Ok(t) -> Error[TypeError (f, e_value, t, UintET)]
-      | err -> err
+      (*controllo che il valore di wei trasferiti sia di tipo compatibile con UintET *)
+      let check_value : typecheck_expr_result =
+        match typecheck_expr f edl vdl fdl e_value with
+        | Ok(t) when subtype t UintET -> Ok(UintET)
+        | Ok(t) -> Error[TypeError (f, e_value, t, UintET)]
+        | err -> err
+      in
 
-      >>+
+      (*controllo che il tipo di ritorno sia uno e uno soltanto e lo restituisce*)
+      let check_ret rt : typecheck_expr_result =
+        match rt with
+          | [] -> Error [MissingReturnType cf]
+          | [rt1] -> Ok(exprtype_of_decltype rt1)
+          | _ -> Error [MultipleReturnTypes cf]
+      in
+      
+      (*cerco la definizione della funzione nella lista di funzioni del contratto e se esiste 
+      ne restituisce la lista di argomenti e il tipo di ritorno*)
+      let get_al_rt _fdl _cf = 
+        match find_fun_in_fdl _fdl _cf with
+        | None -> None
+        | Some(fd) ->
+          (match fd with
+            | Proc(_, lvdl, _, _, _, rt) -> Some(lvdl, rt)
+            | Constr(_,_,_) -> failwith "Can't call constructor"
+          )
+      in
 
-      match typecheck_expr f edl vdl fdl e_to with
-      | Ok(AddrET _) -> (
-        match e_to with
-        | This -> (
-          match find_fun_in_fdl fdl cf with
-          | Some(fd) ->
-            let al =
-              match fd with
-              | Proc(_, lvdl, _, _, _, _) -> lvdl
-              | Constr(_,_,_) -> failwith "Can't call constructor"
-            in check_args al e_args
-          | None -> failwith ("function" ^ cf ^ "not found in contract") )
-        | _ -> Ok(UintET) (* Ignores calls to functions in other contracts *)
-        )
-      | Ok(t) -> Error[TypeError (f, e_to, t, AddrET false)]
-      | err -> err
+      (*cerco la funzione nella lista di funzioni, se non esiste restituisce errore 
+      altrimenti confronta i parametri formali con quelli effettivi e fa il check del tipo di ritorno, 
+      se è tutto a posto lo restituisce altrimenti da errore*)
+      let typecheck_fun_internal _fdl _cf: typecheck_expr_result =
+        match get_al_rt _fdl _cf with
+        | Some(al,rt) -> (
+          match check_args al e_args, check_ret rt with
+          | Ok(), Ok(t) -> Ok(t)
+          | Ok(), Error err2 -> Error err2
+          (* | Error err1, Ok(t) -> Error err1 >>+ Ok(t) *)
+          | Error err1, err2 -> Error err1 >>+ err2
+          )
+        | None -> Error [FunctionNotFound (f,_cf)]
+      in
       
       
+      let typecheck_addr_then_fun : typecheck_expr_result =
+        match typecheck_expr f edl vdl fdl e_to with
+        | Ok(AddrET _) -> (
+          match e_to with
+          | This -> typecheck_fun_internal fdl cf
+          | _ -> Ok(UintET) (* Ignores calls to functions in other contracts *)
+          )
+        | Ok(t) -> Error[TypeError (f, e_to, t, AddrET false)]
+        | err -> err
+      in
+
+      match check_value, typecheck_addr_then_fun with
+      | Ok(UintET), Ok(t) -> Ok(t)
+      | err1, err2 -> err1 >>+ err2
     )
     
 
@@ -447,7 +487,7 @@ let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) (fd
         else (
           match typecheck_expr f edl vdl fdl e, typecheck_expr f edl vdl fdl (Var x) with
           | Ok(te),Ok(tx) -> if subtype te tx then Ok() else Error [TypeError (f,e,te,tx)]
-          | res1,res2 -> typeckeck_result_from_expr_result (res1 >>+ res2)
+          | res1,res2 -> typecheck_result_from_expr_result (res1 >>+ res2)
         )
 
     | Decons(_) -> failwith "TODO: multiple return values"
@@ -461,7 +501,7 @@ let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) (fd
               | MapET(_,txv) when not (subtype tv txv) -> Error [TypeError (f,ev,tv,txv)] 
               | MapET(_,_) -> Ok()
               | _ -> Error [NotMapError (f,Var x)])
-          | res1,res2,res3 -> typeckeck_result_from_expr_result (res1 >>+ res2 >>+ res3))
+          | res1,res2,res3 -> typecheck_result_from_expr_result (res1 >>+ res2 >>+ res3))
 
     | Seq(c1,c2) -> 
         typecheck_cmd f edl vdl fdl c1
@@ -476,22 +516,22 @@ let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) (fd
               >>
               typecheck_cmd f edl vdl fdl c2
           | Ok(te) -> Error [TypeError (f,e,te,BoolET)]
-          | res -> typeckeck_result_from_expr_result res)
+          | res -> typecheck_result_from_expr_result res)
 
     | Send(ercv,eamt) -> (match typecheck_expr f edl vdl fdl ercv with
           | Ok(AddrET(true)) -> Ok() (* can only send to payable addresses *)
           | Ok(t_ercv) -> Error [TypeError(f,ercv,t_ercv,AddrET(true))]
-          | res -> typeckeck_result_from_expr_result res) 
+          | res -> typecheck_result_from_expr_result res) 
           >>
           (match typecheck_expr f edl vdl fdl eamt with
           | Ok(t_eamt) when subtype t_eamt UintET -> Ok()
           | Ok(t_eamt) -> Error [TypeError(f,eamt,t_eamt,UintET)]
-          | res -> typeckeck_result_from_expr_result res)
+          | res -> typecheck_result_from_expr_result res)
 
     | Req(e) -> (match typecheck_expr f edl vdl fdl e with
           | Ok(BoolET) -> Ok() 
           | Ok(te) -> Error [TypeError (f,e,te,BoolET)]
-          | res -> typeckeck_result_from_expr_result res)
+          | res -> typecheck_result_from_expr_result res)
 
     | Block(lvdl,c) ->
         typecheck_local_decls f lvdl
@@ -511,17 +551,17 @@ let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) (fd
         | (h1::t1, h2::t2) ->
             let ty1 = exprtype_of_decltype (basetype_of_vartype (h1.ty)) in 
             (match typecheck_expr f edl vdl fdl h2 with
-            | Ok(ty2) when subtype ty2 ty1 -> Ok() >> check_args t1 t2
+            | Ok(ty2) when subtype ty2 ty1 -> check_args t1 t2
             | Ok(ty2) -> Error[TypeError (f, h2, ty2, ty1)]
-            | err -> typeckeck_result_from_expr_result err)
+            | err -> typecheck_result_from_expr_result err)
         | ([], _::_)
-        | (_::_, []) -> Error[ParameterMismatch f]
+        | (_::_, []) -> Error[ParameterMismatch (f, cf)]
       in
       
       match typecheck_expr f edl vdl fdl e_value with
       | Ok(t) when subtype t UintET -> Ok()
       | Ok(t) -> Error[TypeError (f, e_value, t, UintET)]
-      | err -> typeckeck_result_from_expr_result err
+      | err -> typecheck_result_from_expr_result err
 
       >>
 
@@ -541,28 +581,31 @@ let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) (fd
         )
 
       | Ok(t) -> Error[TypeError (f, e_to, t, AddrET false)]
-      | _ as err -> typeckeck_result_from_expr_result err
+      | _ as err -> typecheck_result_from_expr_result err
 
       )
 
     | ExecProcCall(_) -> assert(false) (* should not happen at static time *)
 
-    | Return(el) -> 
-      let fdecl =
-        match find_fun_in_fdl fdl f with Some(fd) -> fd | None -> failwith ("function" ^ f ^ "not found in contract")
-      in
-      let rt' = 
-        match fdecl with Proc(_, _, _, _, _, rt) -> List.hd rt | Constr(_,_,_) -> assert(false)
+    | Return(el) ->
+      let rt =
+        match find_fun_in_fdl fdl f with
+        | Some(fd) -> (
+          match fd with
+          | Proc(_, _, _, _, _, rt) -> List.hd rt
+          | Constr(_,_,_) -> assert(false)
+          )
+        | None -> failwith ("function" ^ f ^ "not found in contract")
       in
       match el with
-      | [] -> Error [MissingReturnValue f]
-      | h :: [] -> (
+      | [] -> Error [MissingReturnType f]
+      | [h] -> (
         match typecheck_expr f edl vdl fdl h with
-        | Ok(t) when t = (exprtype_of_decltype rt') -> Ok()
-        | Ok(t) -> Error[TypeError (f, h, t, exprtype_of_decltype rt')]
-        | err -> typeckeck_result_from_expr_result err
+        | Ok(t) when subtype (exprtype_of_decltype rt) t -> Ok()
+        | Ok(t) -> Error[TypeError (f, h, t, exprtype_of_decltype rt)] 
+        | Error err -> Error err
         )
-      | _ -> Error [MultipleReturnValues f]
+      | _ -> Error [MultipleReturnTypes f]
 
 
 
@@ -578,7 +621,7 @@ let typecheck_fun (edl : enum_decl list) (vdl : var_decl list) (fdl : fun_decl l
         match rt with
         | [] -> Ok()
         | _ :: [] -> Ok()
-        | _ -> Error [MultipleReturnValues f]
+        | _ -> Error [MultipleReturnTypes f]
       in
       multiple_returns
       >>
