@@ -6,6 +6,14 @@ contract C {
     bool b;
     bool c;
     
+
+    function f(bool t) public returns(bool) {
+        return t;
+    }
+
+    function g(bool l) public returns(int) {
+        return l;
+    }
     function ok() public {
         b=this.f(c);
     }
@@ -14,13 +22,5 @@ contract C {
         b=this.g(c);
     }
 
-    function f(bool bo) public returns(bool) {
-        return bo;
-    }
-
-    function g(bool bo) public returns(int) {
-        return bo;
-    }
 }
-
 

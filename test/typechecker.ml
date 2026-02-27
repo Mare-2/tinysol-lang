@@ -1,7 +1,7 @@
 open TinysolLib.Utils
 open TinysolLib.Typechecker
 
-let test_typecheck (src: string) (exp : bool)=
+let test_typecheck (src: string) (exp : bool) =
   let c = src |> parse_contract |> preprocess_contract in 
   match typecheck_contract c with
     | Ok() -> exp

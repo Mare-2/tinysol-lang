@@ -2,7 +2,7 @@
 pragma solidity >= 0.8.2;
 
 contract C {
-    int x = 0;
+    int x;
     int y = 10;
     bool check;
 
@@ -17,12 +17,22 @@ contract C {
     }
 
     //tipo e numero di parametri passati alla funzione f richiamata sono corretti
-    function ok() public {
+    function ok1() public {
         this.f(y);
     }
 
+    //vari parametri passati sono corretti di numero e tipo 
+    function ok2() public {
+        this.g(30, true);       
+    }
+
+    //la funzione f è dichiarata per prendere come input un intero ma viene chiamata senza passare parametri
+    function err0() public {
+        this.f();
+    }
+
     //la funzione ok() non accetta parametri quindi dovrebbe dare errore
-    function err() public{
+    function err1() public{
         this.ok(10);
     }
 
@@ -31,10 +41,7 @@ contract C {
         this.f(check);
     }
 
-    //vari parametri passati sono corretti di numero e tipo 
-    function ok2() public {
-        this.g(30, true);       
-    }
+    
 
     //vari parametri passati sono di numero corretto ma di tipi sbagliati
     function err3() public{
@@ -45,20 +52,44 @@ contract C {
         this.g(x);
     }
 
+
     
 }
 
 contract D {
     address payable a;
-    int n = 0;
+    address b;
+    int n;
+    bool c;
+
+    //chiamata di una transfer su una variabile di tipo address payable con un valore accettato
+    function ok3() public {
+        a.transfer(30);
+    }
+
+    //chiamata di una funzione di un altro contratto senza parametro, viene ignorata
+    function ok4() public{
+        a.f();
+    }
 
     //valore invalido per il trasferimento
     function err5() public{
         a.transfer(-30);
     }
 
-    //chiamata di una funzione di un altro contratto senza parametro, viene ignorata
-    function h() public{
-        a.f();
+    //valore di wei valido ma indirizzo non payable
+    function err6() public{
+        b.transfer(10);
     }
+    
+    //chiamata di una funzione su una variabile di tipo non address
+    function err7() public{
+        c.f();
+    }
+
+    //chiamata di una funzione non esistente in questo contratto
+    function err8() public{
+        this.a();
+    }
+
 }
